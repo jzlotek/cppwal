@@ -17,6 +17,7 @@ void processArgs(int argc, char **args);
 int numLines(string fileLocation);
 vector<Color> parseLines(string filePath);
 void createResourceFiles(vector<Color> v, string fileLocation);
+void setWallpaper(string fileLocation);
 
 // END DECLARATION
 
@@ -33,8 +34,8 @@ void processArgs(int argc, char **args) {
     }
 
   } else {
-    cout << "No arguments supplied. Exiting..." << endl;
-    exit(1);
+    displayHelp();
+    exit(0);
   }
 
   for (int i = 0; i < arguments.size(); i++) {
@@ -57,30 +58,39 @@ void processArgs(int argc, char **args) {
 
   if (arg[0]) {
     vector<Color> pallet = colorPallet(
-        argparams[0], 16); // must replace 8 with another param later
+        argparams[0], 8); // must replace 8 with another param later
     // system(xrdb -merge ./colors.txt)
     createResourceFiles(pallet, argparams[0]);
+    setWallpaper(argparams[0]);
   }
+}
+
+void setWallpaper(string fileLocation) {
+  string syscall = "feh --bg-fill ~/.config/i3/wall.png";
+  string copy = "cp " + fileLocation + " ~/.config/i3/wall.png";
+  system(copy.c_str());
+  system(syscall.c_str());
 }
 
 void createResourceFiles(vector<Color> v, string fileLocation) {
   string filename = "image_";
-  filename +=
-      fileLocation.substr(fileLocation.rfind('/') + 1,
-                          fileLocation.size() - fileLocation.rfind('/'));
+  filename += fileLocation.substr(
+      fileLocation.rfind('/') + 1,
+      fileLocation.size() - fileLocation.rfind('/') -
+          (fileLocation.size() - fileLocation.rfind(".") + 1));
 
   cout << filename << endl;
 
   Color bg = v[0];
-  Color fg = v[7];
+  Color fg = v[15];
   // bg.lighten(.25);
   // fg.darken(.25);
 
-  ofstream file("current_color_scheme_xrdb");
+  ofstream file("current_color_scheme_xrdb.Xresources");
   file << "*background: " << bg.getHex() << endl;
   file << "*foreground: " << fg.getHex() << endl;
-  file << "URxvt*background: [85]" << bg.getHex() << endl;
-  file << "URxvt*foreground: [85]" << fg.getHex() << endl;
+  file << "URxvt.background: [85]" << bg.getHex() << endl;
+  file << "URxvt.foreground: [85]" << fg.getHex() << endl;
   if (v.size() == 8) {
     for (int i = 0; i < v.size(); i++) {
       Color n = v[i];
@@ -92,16 +102,20 @@ void createResourceFiles(vector<Color> v, string fileLocation) {
       file << "*.color" << i + 8 << ": " << n.getHex() << endl;
     }
   } else {
-    for (int i = 0; i < v.size(); i++) {
-      file << "*color" << i << ": " << v[i].getHex() << endl;
-      file << "*.color" << i << ": " << v[i].getHex() << endl;
+    // for (int i = 0; i < v.size(); i++) {
+    //   file << "*color" << i << ": " << v[i].getHex() << endl;
+    //   file << "*.color" << i << ": " << v[i].getHex() << endl;
+    // }
+    for (int i = v.size() - 1; i >= 0; i--) {
+      file << "*color" << v.size() - i -1 << ": " << v[i].getHex() << endl;
+      file << "*.color" << v.size() - i - 1<< ": " << v[i].getHex() << endl;
     }
   }
 
   file.close();
-  string copy = "cp current_color_scheme_xrdb " + filename;
+  string copy = "cp current_color_scheme_xrdb.Xresources " + filename;
   system(copy.c_str());
-  system("xrdb -merge ./current_color_scheme_xrdb");
+  system("xrdb -merge ./current_color_scheme_xrdb.Xresources");
   system("i3-msg restart");
 }
 
@@ -140,14 +154,15 @@ vector<Color> parseLines(string fileText) {
   return colorPallet;
 }
 
-string imagemagick(string filepath) {
+// Returns stdoutput from calling imagemagick command
+string imagemagick(string shellCommand) {
   int PATH_MAX = 100;
   FILE *file;
   int status;
   char path[PATH_MAX];
   string line;
 
-  file = popen(filepath.c_str(), "r");
+  file = popen(shellCommand.c_str(), "r");
 
   while (fgets(path, PATH_MAX, file) != NULL) {
     line += path;
@@ -199,7 +214,7 @@ vector<Color> colorPallet(string filePath, int colorCount) {
     autoGenerate(pallet);
   }
 
-  Algorithm::quicksort(pallet, 0, pallet.size() - 1);
+  //Algorithm::quicksort(pallet, 0, pallet.size() - 1);
   for (int i = 0; i < pallet.size(); i++) {
     cout << pallet[i].getHex() << " " << pallet[i].getHue() << " "
          << pallet[i].getLightness() << " " << pallet[i].getSaturation()
