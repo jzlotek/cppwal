@@ -9,3 +9,4 @@ $(EXE): $(FILES)
 
 clean:
 	rm -fv src/*.o
+	rm ./$(EXE)
