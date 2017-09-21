@@ -6,7 +6,9 @@ Inspiration came from using pywal on a slower computer and wanted to add the abi
 
 ```
 make
+```
 
+```
 ./cwal -h
 ```
 
