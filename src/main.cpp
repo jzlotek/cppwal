@@ -1,5 +1,6 @@
 #include "Algorithms.h"
 #include "Color.h"
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -10,16 +11,19 @@
 using namespace std;
 
 const int NOT_EXISTANT_COMMAND = 32512;
+const string HOME = string(getenv("HOME"));
 
 // DECLARE FUNCTIONS
 vector<Color> colorPallet(string filePath, int colorCount);
 void processArgs(int argc, char **args);
 int numLines(string fileLocation);
 vector<Color> parseLines(string filePath);
-void createResourceFiles(vector<Color> v, string fileLocation);
+void createResourceFiles(vector<Color> v, string fileLocation, string alpha);
 void setWallpaper(string fileLocation);
-void reloadColors(vector<vector<Color>> v);
+void reloadColors(vector<vector<Color>> v, string alpha);
 string popenCommand(string shellCommand);
+void reload();
+void cleanCachedFiles();
 
 // END DECLARATION
 
@@ -39,6 +43,7 @@ void processArgs(int argc, char **args) {
     displayHelp();
     exit(0);
   }
+  argparams[1] = "100";
 
   for (int i = 0; i < arguments.size(); i++) {
     if (arguments[i] == "-h") {
@@ -55,21 +60,40 @@ void processArgs(int argc, char **args) {
           exit(1);
         }
       }
+      if (arguments[i] == "-a") {
+        arg[1] = true;
+        if (i < arguments.size() - 1 && arguments[i + 1][0] != '-' &&
+            Algorithm::toNumber(arguments[i + 1]) <= 100 &&
+            Algorithm::toNumber(arguments[i + 1]) >= 0) {
+          argparams[1] = arguments[i + 1];
+          i++;
+        } else {
+          argparams[1] = "100";
+          exit(1);
+        }
+      }
+      if (arguments[i] == "-c") {
+        arg[2] = true;
+      }
     }
   }
 
+  if(arg[2]){
+    cleanCachedFiles();
+  }
+
   if (arg[0]) {
-    vector<Color> pallet = colorPallet(
-        argparams[0], 16); // must replace 8 with another param later
+    vector<Color> pallet = colorPallet(argparams[0], 16);
+    // must replace 8 with another param later
     // system(xrdb -merge ./colors.txt)
-    createResourceFiles(pallet, argparams[0]);
+    createResourceFiles(pallet, argparams[0], argparams[1]);
     setWallpaper(argparams[0]);
     vector<vector<Color>> fullPallet(2);
 
     fullPallet[1] = pallet;
     fullPallet[0].push_back(pallet[0]);
     fullPallet[0].push_back(pallet[7]);
-    reloadColors(fullPallet);
+    reloadColors(fullPallet, argparams[1]);
   }
 }
 
@@ -80,9 +104,18 @@ void setWallpaper(string fileLocation) {
   system(syscall.c_str());
 }
 
-void reloadColors(vector<vector<Color>> v) {
+void cleanCachedFiles(){
+  string clean = "rm "+HOME+"/.cache/cwal/schemes/*";
+  system(clean.c_str());
+}
+
+void reloadColors(vector<vector<Color>> v, string alpha) {
   // make sure that there are 2 vectors: 1 for 16 color 1 for special
   if (v.size() == 2) {
+    string a = "";
+    if (alpha != "100") {
+      a = "[" + alpha + "]";
+    }
     string sequences = "";
     // string sequences = "";
     stringstream num;
@@ -92,13 +125,13 @@ void reloadColors(vector<vector<Color>> v) {
       num.str(std::string());
     }
     /* Foreground */
-    sequences += "\033]10;" + v[0][1].getHex() + "\007";
-    sequences += "\033]12;" + v[0][1].getHex() + "\007";
-    sequences += "\033]13;" + v[0][1].getHex() + "\007";
+    sequences += "\033]10;" + a + "" + v[0][1].getHex() + "\007";
+    sequences += "\033]12;" + a + "" + v[0][1].getHex() + "\007";
+    sequences += "\033]13;" + a + "" + v[0][1].getHex() + "\007";
     /* Background */
-    sequences += "\033]11;" + v[0][0].getHex() + "\007";
-    sequences += "\033]14;" + v[0][0].getHex() + "\007";
-    sequences += "\033]708;" + v[0][0].getHex() + "\007";
+    sequences += "\033]11;" + a + "" + v[0][0].getHex() + "\007";
+    sequences += "\033]14;" + a + "" + v[0][0].getHex() + "\007";
+    sequences += "\033]708;" + a + "" + v[0][0].getHex() + "\007";
 
     // ofstream file("sequences");
     // file << sequences;
@@ -116,27 +149,30 @@ void reloadColors(vector<vector<Color>> v) {
     cout << "Error" << endl;
     exit(1);
   }
+  reload();
 }
 
-void createResourceFiles(vector<Color> v, string fileLocation) {
-  string filename = "image_";
+void createResourceFiles(vector<Color> v, string fileLocation, string alpha) {
+  string filename = HOME + "/.cache/cwal/schemes/image_";
   filename += fileLocation.substr(
       fileLocation.rfind('/') + 1,
       fileLocation.size() - fileLocation.rfind('/') -
           (fileLocation.size() - fileLocation.rfind(".") + 1));
 
-  cout << filename << endl;
-
+  string a = "";
+  if (alpha != "100") {
+    a = "[" + alpha + "]";
+  }
   Color bg = v[0];
   Color fg = v[15];
   // bg.lighten(.25);
   // fg.darken(.25);
 
-  ofstream file("current_color_scheme_xrdb.Xresources");
+  ofstream file(HOME + "/.cache/cwal/current_color_scheme_xrdb.Xresources");
   file << "*background: " << bg.getHex() << endl;
   file << "*foreground: " << fg.getHex() << endl;
-  file << "URxvt.background: [85]" << bg.getHex() << endl;
-  file << "URxvt.foreground: [85]" << fg.getHex() << endl;
+  file << "URxvt.background: " << a << bg.getHex() << endl;
+  file << "URxvt.foreground: " << a << fg.getHex() << endl;
   if (v.size() == 8) {
     for (int i = 0; i < v.size(); i++) {
       Color n = v[i];
@@ -148,20 +184,24 @@ void createResourceFiles(vector<Color> v, string fileLocation) {
       file << "*.color" << i + 8 << ": " << n.getHex() << endl;
     }
   } else {
-    // for (int i = 0; i < v.size(); i++) {
-    //   file << "*color" << i << ": " << v[i].getHex() << endl;
-    //   file << "*.color" << i << ": " << v[i].getHex() << endl;
-    // }
-    for (int i = v.size() - 1; i >= 0; i--) {
-      file << "*color" << v.size() - i - 1 << ": " << v[i].getHex() << endl;
-      file << "*.color" << v.size() - i - 1 << ": " << v[i].getHex() << endl;
+    for (int i = 0; i < v.size(); i++) {
+      file << "*color" << i << ": " << v[i].getHex() << endl;
+      file << "*.color" << i << ": " << v[i].getHex() << endl;
     }
+    // for (int i = v.size() - 1; i >= 0; i--) {
+    //   file << "*color" << v.size() - i - 1 << ": " << v[i].getHex() << endl;
+    //   file << "*.color" << v.size() - i - 1 << ": " << v[i].getHex() << endl;
+    // }
   }
-
   file.close();
-  string copy = "cp current_color_scheme_xrdb.Xresources " + filename;
+
+  string copy = "cp " + HOME +
+                "/.cache/cwal/current_color_scheme_xrdb.Xresources " + filename;
   system(copy.c_str());
-  system("xrdb -merge ./current_color_scheme_xrdb.Xresources");
+}
+
+void reload() {
+  system("xrdb -merge ~/.cache/cwal/current_color_scheme_xrdb.Xresources");
   system("i3-msg restart");
 }
 
@@ -260,12 +300,12 @@ vector<Color> colorPallet(string filePath, int colorCount) {
     autoGenerate(pallet);
   }
 
-  // Algorithm::quicksort(pallet, 0, pallet.size() - 1);
-  for (int i = 0; i < pallet.size(); i++) {
-    cout << pallet[i].getHex() << " " << pallet[i].getHue() << " "
-         << pallet[i].getLightness() << " " << pallet[i].getSaturation()
-         << endl;
-  }
+  Algorithm::quicksort(pallet, 0, pallet.size() - 1);
+  // for (int i = 0; i < pallet.size(); i++) {
+  //   cout << pallet[i].getHex() << " " << pallet[i].getHue() << " "
+  //        << pallet[i].getLightness() << " " << pallet[i].getSaturation()
+  //        << endl;
+  // }
   return pallet;
 }
 

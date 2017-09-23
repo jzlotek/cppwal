@@ -4,12 +4,20 @@ Inspiration came from using pywal on a slower computer and wanted to add the abi
 
 ## Getting Started
 
+### To build individual components
+```
+make build
+make install
+```
+
+### To compile and install
 ```
 make
 ```
 
+
 ```
-./cwal -h
+cwal -h
 ```
 
 ### Pre-requisites

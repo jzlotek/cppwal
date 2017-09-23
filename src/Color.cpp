@@ -17,7 +17,7 @@ void Color::checkValues() {
   _r = ((_r > 255) ? 255 : ((_r < 0) ? 0 : r));
   _g = ((_g > 255) ? 255 : ((_g < 0) ? 0 : g));
   _b = ((_b > 255) ? 255 : ((_b < 0) ? 0 : b));
-  cout << getRed() << getGreen() << getBlue() << endl;
+  //cout << getRed() << getGreen() << getBlue() << endl;
 }
 Color::Color(string hex) {
   if (hex.length() == 7 && hex[0] == '#') {

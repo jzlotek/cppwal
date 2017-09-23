@@ -1,4 +1,5 @@
 #include "Algorithms.h"
+#include <cmath>
 
 using namespace std;
 
@@ -32,4 +33,35 @@ void Algorithm::quicksort(vector<Color> &v, int lo, int hi) {
     Algorithm::quicksort(v, lo, p - 1);
     Algorithm::quicksort(v, p + 1, hi);
   }
+}
+
+int Algorithm::classifyCharacter(char c) {
+  if (c == '1')
+    return 1;
+  else if (c == '2')
+    return 2;
+  else if (c == '3')
+    return 3;
+  else if (c == '4')
+    return 4;
+  else if (c == '5')
+    return 5;
+  else if (c == '6')
+    return 6;
+  else if (c == '7')
+    return 7;
+  else if (c == '8')
+    return 8;
+  else if (c == '9')
+    return 9;
+  else
+    return 0;
+}
+
+int Algorithm::toNumber(string s) {
+  int n = 0;
+  for (int i = 0; i < s.size(); i++) {
+    n += Algorithm::classifyCharacter(s[i]) * pow(10, s.size() - 1 - i);
+  }
+  return n;
 }

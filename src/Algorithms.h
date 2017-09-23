@@ -12,6 +12,8 @@ class Algorithm {
 public:
   static void quicksort(vector<Color> &v, int lo, int hi);
   static int partition(vector<Color> &v, int lo, int hi);
+  static int classifyCharacter(char);
+  static int toNumber(string);
 
 private:
 };
