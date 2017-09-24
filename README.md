@@ -17,7 +17,7 @@ make
 
 ### To set wallpaper and create color scheme
 ```
-cwal -i {File location of wall paper}
+cwal -i {File location of wallpaper}
 ```
 
 ### To clear cached color schemes
