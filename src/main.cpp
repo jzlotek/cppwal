@@ -24,6 +24,7 @@ void reloadColors(vector<vector<Color>> v, string alpha);
 string popenCommand(string shellCommand);
 void reload();
 void cleanCachedFiles();
+void autoGenerate(vector<Color> &v, int max);
 
 // END DECLARATION
 
@@ -78,12 +79,12 @@ void processArgs(int argc, char **args) {
     }
   }
 
-  if(arg[2]){
+  if (arg[2]) {
     cleanCachedFiles();
   }
 
   if (arg[0]) {
-    vector<Color> pallet = colorPallet(argparams[0], 16);
+    vector<Color> pallet = colorPallet(argparams[0], 8);
     // must replace 8 with another param later
     // system(xrdb -merge ./colors.txt)
     createResourceFiles(pallet, argparams[0], argparams[1]);
@@ -91,8 +92,25 @@ void processArgs(int argc, char **args) {
     vector<vector<Color>> fullPallet(2);
 
     fullPallet[1] = pallet;
-    fullPallet[0].push_back(pallet[0]);
-    fullPallet[0].push_back(pallet[7]);
+    Color bg = pallet[0];
+    Color fg = pallet[7];
+
+    if (pallet[0].getLightness() < 0.5) {
+      bg.darken(0.1);
+      fg.lighten(0.1);
+      for (int i = 0; i < fullPallet[1].size(); i++) {
+        fullPallet[1][i].lighten(0.9);
+      }
+    } else {
+      bg.lighten(0.1);
+      fg.darken(0.1);
+      for (int i = 0; i < fullPallet[1].size(); i++) {
+        fullPallet[1][i].darken(0.9);
+      }
+    }
+
+    fullPallet[0].push_back(bg);
+    fullPallet[0].push_back(fg);
     reloadColors(fullPallet, argparams[1]);
   }
 }
@@ -104,8 +122,8 @@ void setWallpaper(string fileLocation) {
   system(syscall.c_str());
 }
 
-void cleanCachedFiles(){
-  string clean = "rm "+HOME+"/.cache/cwal/schemes/*";
+void cleanCachedFiles() {
+  string clean = "rm " + HOME + "/.cache/cwal/schemes/*";
   system(clean.c_str());
 }
 
@@ -257,11 +275,10 @@ string popenCommand(string shellCommand) {
   return line;
 }
 
-void autoGenerate(vector<Color> &v) {
+void autoGenerate(vector<Color> &v, int max) {
   Color lastInList = v[v.size() - 1];
-  int size = v.size();
-  for (int i = 0; i < 8 - size; i++) {
-    lastInList.setHue(lastInList.getHue() + 135.5 * i);
+  while (v.size() < max) {
+    lastInList.setHue(lastInList.getHue() + 135.5g);
     // cout<<lastInList.getHex()<<endl;
     v.push_back(lastInList);
   }
@@ -297,7 +314,7 @@ vector<Color> colorPallet(string filePath, int colorCount) {
          << endl;
     // Algorithm::quicksort(pallet, 0, pallet.size() - 1);
     // autoGenerate(pallet);
-    autoGenerate(pallet);
+    autoGenerate(pallet, 16);
   }
 
   Algorithm::quicksort(pallet, 0, pallet.size() - 1);

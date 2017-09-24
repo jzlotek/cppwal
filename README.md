@@ -15,9 +15,19 @@ make install
 make
 ```
 
-
+### To set wallpaper and create color scheme
 ```
-cwal -h
+cwal -i {File location of wall paper}
+```
+
+### To clear cached color schemes
+```
+cwal -c
+```
+
+### To set terminal transparency
+```
+cwal -a {integer}
 ```
 
 ### Pre-requisites
