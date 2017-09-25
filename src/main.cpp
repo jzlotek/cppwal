@@ -14,17 +14,19 @@ const int NOT_EXISTANT_COMMAND = 32512;
 const string HOME = string(getenv("HOME"));
 
 // DECLARE FUNCTIONS
-vector<Color> colorPallet(string filePath, int colorCount);
+vector<Color> generatePalletColors(string filePath, int colorCount);
 void processArgs(int argc, char **args);
 int numLines(string fileLocation);
 vector<Color> parseLines(string filePath);
-void createResourceFiles(vector<Color> v, string fileLocation, string alpha);
+void createResourceFiles(vector<vector<Color>> v, string fileLocation,
+                         string alpha);
 void setWallpaper(string fileLocation);
 void reloadColors(vector<vector<Color>> v, string alpha);
 string popenCommand(string shellCommand);
 void reload();
 void cleanCachedFiles();
 void autoGenerate(vector<Color> &v, int max);
+void loadLastScheme(string alpha);
 
 // END DECLARATION
 
@@ -76,6 +78,10 @@ void processArgs(int argc, char **args) {
       if (arguments[i] == "-c") {
         arg[2] = true;
       }
+
+      if (arguments[i] == "-R") {
+        arg[3] = true;
+      }
     }
   }
 
@@ -84,35 +90,71 @@ void processArgs(int argc, char **args) {
   }
 
   if (arg[0]) {
-    vector<Color> pallet = colorPallet(argparams[0], 8);
+    if (arg[3]) {
+      cout << "Cannot use -R with -i" << endl;
+      exit(0);
+    }
+    vector<Color> pallet = generatePalletColors(argparams[0], 16);
     // must replace 8 with another param later
     // system(xrdb -merge ./colors.txt)
-    createResourceFiles(pallet, argparams[0], argparams[1]);
     setWallpaper(argparams[0]);
     vector<vector<Color>> fullPallet(2);
 
     fullPallet[1] = pallet;
-    Color bg = pallet[0];
+    // Color bg = pallet[0];
+    Color bg = parseLines(popenCommand("convert +dither -resize 1x1 " +
+                                       argparams[0] + " txt:-"))[0];
     Color fg = pallet[7];
 
-    if (pallet[0].getLightness() < 0.5) {
-      bg.darken(0.1);
-      fg.lighten(0.1);
+    if (bg.getLightness() < 0.5) {
+      bg.darken(0.2);
+      fg.lighten(0.2);
+
       for (int i = 0; i < fullPallet[1].size(); i++) {
-        fullPallet[1][i].lighten(0.9);
+        fullPallet[1][i].lighten(0.75);
       }
     } else {
-      bg.lighten(0.1);
-      fg.darken(0.1);
+      bg.lighten(0.2);
+      fg.darken(0.2);
+
       for (int i = 0; i < fullPallet[1].size(); i++) {
-        fullPallet[1][i].darken(0.9);
+        fullPallet[1][i].darken(0.75);
       }
     }
 
     fullPallet[0].push_back(bg);
     fullPallet[0].push_back(fg);
-    reloadColors(fullPallet, argparams[1]);
+
+    createResourceFiles(fullPallet, argparams[0], argparams[1]);
+    loadLastScheme(argparams[1]);
   }
+
+  if (arg[3]) {
+    loadLastScheme(argparams[1]);
+  }
+}
+
+void loadLastScheme(string alpha) {
+  cout << "Reloading last color scheme" << endl;
+  string color;
+  vector<vector<Color>> pallet(2);
+  ifstream colorFile(HOME + "/.cache/cwal/colors");
+
+  while (!colorFile.eof()) {
+    getline(colorFile, color);
+    pallet[0].push_back(Color(color));
+    getline(colorFile, color);
+    pallet[0].push_back(Color(color));
+
+    getline(colorFile, color);
+    if (color != "") {
+      pallet[1].push_back(Color(color));
+    }
+  }
+
+  reloadColors(pallet, alpha);
+
+  colorFile.close();
 }
 
 void setWallpaper(string fileLocation) {
@@ -123,7 +165,7 @@ void setWallpaper(string fileLocation) {
 }
 
 void cleanCachedFiles() {
-  string clean = "rm " + HOME + "/.cache/cwal/schemes/*";
+  string clean = "rm -f " + HOME + "/.cache/cwal/schemes/*";
   system(clean.c_str());
 }
 
@@ -162,7 +204,7 @@ void reloadColors(vector<vector<Color>> v, string alpha) {
                sequences + "\" > \"$term\" &\ndone";
 
     system(t.c_str());
-    cout << "\n\nColor applied to terminals" << endl;
+    cout << "Color applied to terminals" << endl;
   } else {
     cout << "Error" << endl;
     exit(1);
@@ -170,7 +212,14 @@ void reloadColors(vector<vector<Color>> v, string alpha) {
   reload();
 }
 
-void createResourceFiles(vector<Color> v, string fileLocation, string alpha) {
+/// NOTE: CHANGE parameters of createResourceFiles to vector<vector<Color>>
+void createResourceFiles(vector<vector<Color>> v, string fileLocation,
+                         string alpha) {
+
+  if (v.size() != 2) {
+    exit(1);
+  }
+
   string filename = HOME + "/.cache/cwal/schemes/image_";
   filename += fileLocation.substr(
       fileLocation.rfind('/') + 1,
@@ -181,40 +230,43 @@ void createResourceFiles(vector<Color> v, string fileLocation, string alpha) {
   if (alpha != "100") {
     a = "[" + alpha + "]";
   }
-  Color bg = v[0];
-  Color fg = v[15];
-  // bg.lighten(.25);
-  // fg.darken(.25);
 
-  ofstream file(HOME + "/.cache/cwal/current_color_scheme_xrdb.Xresources");
-  file << "*background: " << bg.getHex() << endl;
-  file << "*foreground: " << fg.getHex() << endl;
-  file << "URxvt.background: " << a << bg.getHex() << endl;
-  file << "URxvt.foreground: " << a << fg.getHex() << endl;
-  if (v.size() == 8) {
-    for (int i = 0; i < v.size(); i++) {
-      Color n = v[i];
+  ofstream xRFile(HOME + "/.cache/cwal/current_color_scheme_xrdb.Xresources");
+  ofstream colorFile(HOME + "/.cache/cwal/colors");
+  
+  xRFile << "*background: " << v[0][0].getHex() << endl;
+  xRFile << "*foreground: " << v[0][1].getHex() << endl;
+  xRFile << "URxvt.background: " << a << v[0][0].getHex() << endl;
+  xRFile << "URxvt.foreground: " << a << v[0][1].getHex() << endl;
+  colorFile << v[0][0].getHex() << endl;
+  colorFile << v[0][1].getHex() << endl;
+
+  if (v[1].size() == 8) {
+    for (int i = 0; i < v[1].size(); i++) {
+      Color n = v[1][i];
       n.lighten(.8);
-      file << "*color" << i << ": " << n.getHex() << endl;
-      file << "*.color" << i << ": " << n.getHex() << endl;
+      xRFile << "*color" << i << ": " << n.getHex() << endl;
+      xRFile << "*.color" << i << ": " << n.getHex() << endl;
+      colorFile << n.getHex() << endl;
       n.lighten(.8);
-      file << "*color" << i + 8 << ": " << n.getHex() << endl;
-      file << "*.color" << i + 8 << ": " << n.getHex() << endl;
+      xRFile << "*color" << i + 8 << ": " << n.getHex() << endl;
+      xRFile << "*.color" << i + 8 << ": " << n.getHex() << endl;
+      colorFile << n.getHex() << endl;
     }
   } else {
-    for (int i = 0; i < v.size(); i++) {
-      file << "*color" << i << ": " << v[i].getHex() << endl;
-      file << "*.color" << i << ": " << v[i].getHex() << endl;
+    for (int i = 0; i < v[1].size(); i++) {
+      Color n = v[1][i];
+      n.lighten(.8);
+      xRFile << "*color" << i << ": " << n.getHex() << endl;
+      xRFile << "*.color" << i << ": " << n.getHex() << endl;
+      colorFile << n.getHex() << endl;
     }
-    // for (int i = v.size() - 1; i >= 0; i--) {
-    //   file << "*color" << v.size() - i - 1 << ": " << v[i].getHex() << endl;
-    //   file << "*.color" << v.size() - i - 1 << ": " << v[i].getHex() << endl;
-    // }
   }
-  file.close();
 
-  string copy = "cp " + HOME +
-                "/.cache/cwal/current_color_scheme_xrdb.Xresources " + filename;
+  xRFile.close();
+  colorFile.close();
+
+  string copy = "cp " + HOME + "/.cache/cwal/colors " + filename;
   system(copy.c_str());
 }
 
@@ -278,13 +330,13 @@ string popenCommand(string shellCommand) {
 void autoGenerate(vector<Color> &v, int max) {
   Color lastInList = v[v.size() - 1];
   while (v.size() < max) {
-    lastInList.setHue(lastInList.getHue() + 135.5g);
+    lastInList.setHue(lastInList.getHue() + 135.5);
     // cout<<lastInList.getHex()<<endl;
     v.push_back(lastInList);
   }
 }
 
-vector<Color> colorPallet(string filePath, int colorCount) {
+vector<Color> generatePalletColors(string filePath, int colorCount) {
   if (system("convert > /dev/null") == NOT_EXISTANT_COMMAND) {
     cout << "ImageMagick not found. Please install before using. Exiting..."
          << endl;
@@ -303,26 +355,28 @@ vector<Color> colorPallet(string filePath, int colorCount) {
     string imagemagickText = popenCommand(fm);
 
     pallet = parseLines(imagemagickText);
-    if (pallet.size() < colorCount)
+
+    if (pallet.size() != colorCount && pallet.size() < 12) {
       colorCount -= 8;
+    }
+    if (pallet.size() > 8)
+      break;
   }
 
-  if (pallet.size() < 8) {
+  if (colorCount < 8)
+    colorCount = 8;
+
+  if (pallet.size() < colorCount) {
     // run code to auto generate colorscheme
     cout << "Not enough colors in given picture\nNow auto-generating "
             "colorscheme"
          << endl;
-    // Algorithm::quicksort(pallet, 0, pallet.size() - 1);
-    // autoGenerate(pallet);
-    autoGenerate(pallet, 16);
+
+    autoGenerate(pallet, colorCount);
   }
 
-  Algorithm::quicksort(pallet, 0, pallet.size() - 1);
-  // for (int i = 0; i < pallet.size(); i++) {
-  //   cout << pallet[i].getHex() << " " << pallet[i].getHue() << " "
-  //        << pallet[i].getLightness() << " " << pallet[i].getSaturation()
-  //        << endl;
-  // }
+  // Algorithm::quicksort(pallet, 0, pallet.size() - 1);
+
   return pallet;
 }
 
@@ -332,8 +386,8 @@ int main(int argc, char **args) {
 
   // test << system("ls -al ~");
   // if return is 32512, command is non existant and must be installed
-  // colorPallet("~/Pictures/Wallpapers/Landscapes/waterfall_pool.jpg", 16);
-  // Detect proper installed programs
+  // generatePalletColors("~/Pictures/Wallpapers/Landscapes/waterfall_pool.jpg",
+  // 16); Detect proper installed programs
   if (system("feh -h > /dev/null") == NOT_EXISTANT_COMMAND) {
     cout << "Error: feh not detected. Please install feh before using" << endl;
     exit(1);

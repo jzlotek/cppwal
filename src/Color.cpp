@@ -34,29 +34,30 @@ Color::Color(string hex) {
     _g = 0;
     _b = 0;
   }
+  checkValues();
 }
 
 string Color::getHex() const {
   string hex = "#";
-  hex += hexRef[_r / 16];
-  hex += hexRef[_r % 16];
-  hex += hexRef[_g / 16];
-  hex += hexRef[_g % 16];
-  hex += hexRef[_b / 16];
-  hex += hexRef[_b % 16];
+  hex += hexRef[_r / hexRef.size()];
+  hex += hexRef[_r % hexRef.size()];
+  hex += hexRef[_g / hexRef.size()];
+  hex += hexRef[_g % hexRef.size()];
+  hex += hexRef[_b / hexRef.size()];
+  hex += hexRef[_b % hexRef.size()];
   return hex;
 }
 void Color::darken(double amount) {
-  _r *= (1 - amount);
-  _g *= (1 - amount);
-  _b *= (1 - amount);
+  _r *= (1.0 - amount);
+  _g *= (1.0 - amount);
+  _b *= (1.0 - amount);
   checkValues();
 }
 
 void Color::lighten(double amount) {
-  _r += ((255 - _r) * (1 - amount));
-  _g += ((255 - _g) * (1 - amount));
-  _b += ((255 - _b) * (1 - amount));
+  _r += ((255.0 - _r) * (1.0 - amount));
+  _g += ((255.0 - _g) * (1.0 - amount));
+  _b += ((255.0 - _b) * (1.0 - amount));
   checkValues();
 }
 
